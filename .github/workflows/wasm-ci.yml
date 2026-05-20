@@ -1,0 +1,59 @@
+name: wasm-ci
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - apps/wasm-worker/**
+      - .github/workflows/wasm-ci.yml
+  pull_request:
+    paths:
+      - apps/wasm-worker/**
+
+permissions: { contents: read }
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults: { run: { working-directory: apps/wasm-worker } }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: "20", cache: npm, cache-dependency-path: apps/wasm-worker/package-lock.json }
+      - name: Install Spin
+        run: |
+          curl -fsSL https://spinframework.dev/downloads/install.sh | bash
+          sudo mv ./spin /usr/local/bin/spin
+          spin --version
+      - run: npm ci
+      - run: npm run build
+      - name: SBOM
+        run: |
+          curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh | sh -s -- -b /usr/local/bin
+          syft dist/nebulastream-worker.wasm -o spdx-json > sbom.spdx.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: nebulastream-worker-wasm
+          path: |
+            apps/wasm-worker/dist/nebulastream-worker.wasm
+            apps/wasm-worker/sbom.spdx.json
+          retention-days: 30
+
+  deploy:
+    needs: build
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment: production
+    defaults: { run: { working-directory: apps/wasm-worker } }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: "20" }
+      - run: |
+          curl -fsSL https://spinframework.dev/downloads/install.sh | bash
+          sudo mv ./spin /usr/local/bin/spin
+      - run: npm ci && npm run build
+      - name: spin deploy
+        env:
+          SPIN_AUTH_TOKEN: ${{ secrets.SPIN_AUTH_TOKEN }}
+        run: spin deploy

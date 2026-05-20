@@ -1,0 +1,22 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: control-plane-config
+  namespace: nebulastream
+data:
+  WORKER_US_EAST_URL: "https://nebula-us.nebulastream.workers.dev"
+  WORKER_EU_WEST_URL: "https://nebula-eu.nebulastream.workers.dev"
+  WORKER_AP_SOUTH_URL: "https://nebula-apac.nebulastream.workers.dev"
+  POLL_INTERVAL_SEC: "5"
+  BREACH_THRESHOLD_MS: "200"
+  RATE_LIMIT_SEC: "30"
+  MIN_WEIGHT: "5"
+  OLLAMA_URL: "http://ollama.nebulastream.svc.cluster.local:11434/api/generate"
+  OLLAMA_EMBEDDINGS_URL: "http://ollama.nebulastream.svc.cluster.local:11434/api/embeddings"
+  OLLAMA_MODEL: "llama3.2"
+  MILVUS_HOST: "milvus.nebulastream.svc.cluster.local"
+  MILVUS_PORT: "19530"
+  COLLECTION: "incidents"
+  VECTOR_DIM: "3072"
+  LOG_LEVEL: "INFO"
+  LOG_FORMAT: "json"

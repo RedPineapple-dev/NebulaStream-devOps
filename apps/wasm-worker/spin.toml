@@ -1,0 +1,22 @@
+spin_manifest_version = 2
+
+[application]
+name = "nebulastream-worker"
+version = "0.1.0"
+authors = ["you"]
+description = "NebulaStream edge WASM worker"
+
+[[trigger.http]]
+route = "/..."
+component = "nebulastream-worker"
+
+[component.nebulastream-worker]
+source = "dist/nebulastream-worker.wasm"
+allowed_outbound_hosts = []
+
+[component.nebulastream-worker.variables]
+region = "unknown"
+
+[component.nebulastream-worker.build]
+command = "npm run build"
+watch = ["src/**/*.ts", "package.json"]

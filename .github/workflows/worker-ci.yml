@@ -1,0 +1,50 @@
+name: worker-ci
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - apps/edge-workers/**
+      - .github/workflows/worker-ci.yml
+  pull_request:
+    paths:
+      - apps/edge-workers/**
+
+permissions: { contents: read }
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        region: [us, eu, apac]
+    defaults: { run: { working-directory: apps/edge-workers/${{ matrix.region }} } }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: "20" }
+      - name: Install wrangler
+        run: npm install -g wrangler
+      - name: Validate worker
+        run: |
+          node --check index.js
+          wrangler deploy --dry-run --outdir=dist
+
+  deploy:
+    needs: lint
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment: production
+    strategy:
+      matrix:
+        region: [us, eu, apac]
+      max-parallel: 3
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: "20" }
+      - uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: apps/edge-workers/${{ matrix.region }}

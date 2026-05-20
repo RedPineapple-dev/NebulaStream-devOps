@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NebulaStream — Live Dashboard</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { background:#0a0e1a; color:#e2e8f0; font-family:'SF Mono',monospace; }
+  header { background:#0f1629; border-bottom:1px solid #1e3a5f; padding:16px 24px;
+           display:flex; align-items:center; justify-content:space-between; }
+  header h1 { font-size:20px; color:#60a5fa; letter-spacing:2px; }
+  .badge { background:#1e3a5f; color:#60a5fa; padding:4px 12px; border-radius:20px; font-size:12px; }
+  .grid { display:grid; grid-template-columns:1fr 1fr; grid-template-rows:auto auto;
+          gap:16px; padding:16px; height:calc(100vh - 60px); }
+  .panel { background:#0f1629; border:1px solid #1e3a5f; border-radius:12px; padding:20px; overflow:hidden; }
+  .panel h2 { font-size:12px; color:#64748b; letter-spacing:2px; margin-bottom:16px; text-transform:uppercase; }
+
+  /* World map */
+  #map-panel { position:relative; }
+  svg#world { width:100%; height:200px; }
+  .region-dot { cursor:default; transition:all 0.5s ease; }
+  .region-label { font-size:11px; fill:#94a3b8; }
+  .region-latency { font-size:13px; font-weight:bold; }
+
+  /* Weight bars */
+  .weight-bar-wrap { margin-bottom:16px; }
+  .weight-bar-label { display:flex; justify-content:space-between; font-size:12px;
+                      color:#94a3b8; margin-bottom:6px; }
+  .weight-bar-track { background:#1e2d40; border-radius:6px; height:24px; overflow:hidden; }
+  .weight-bar-fill  { height:100%; border-radius:6px; transition:width 1s ease;
+                      display:flex; align-items:center; padding-left:10px;
+                      font-size:12px; font-weight:bold; color:#fff; }
+  .bar-us   { background: linear-gradient(90deg,#3b82f6,#60a5fa); }
+  .bar-eu   { background: linear-gradient(90deg,#8b5cf6,#a78bfa); }
+  .bar-apac { background: linear-gradient(90deg,#06b6d4,#67e8f9); }
+
+  /* AI log */
+  #ai-log { overflow-y:auto; max-height:220px; }
+  .log-entry { border-left:2px solid #1e3a5f; padding:8px 12px; margin-bottom:8px;
+               font-size:12px; line-height:1.6; }
+  .log-entry.decision { border-color:#60a5fa; }
+  .log-entry.thinking { border-color:#f59e0b; }
+  .log-entry.chaos    { border-color:#ef4444; }
+  .log-entry.veto     { border-color:#f97316; background:rgba(249,115,22,0.06); }
+  .veto-bar     { display:flex; align-items:center; gap:8px; margin-top:6px; font-size:11px; }
+  .veto-meter   { flex:1; height:6px; background:#1e2d40; border-radius:3px; overflow:hidden; }
+  .veto-fill    { height:100%; background:linear-gradient(90deg,#ef4444,#f59e0b,#22c55e); transition:width 0.5s ease; }
+  .veto-thresh  { position:relative; height:6px; margin-top:-6px; pointer-events:none; }
+  .veto-thresh::before { content:""; position:absolute; top:-2px; bottom:-2px; width:2px; background:#94a3b8; }
+  .badge-veto   { background:#f97316; color:#fff; padding:2px 6px; border-radius:4px; font-size:10px; font-weight:bold; }
+  .log-time { color:#475569; font-size:11px; }
+  .log-text { color:#cbd5e1; }
+  .log-weights { color:#60a5fa; font-size:11px; margin-top:4px; }
+
+  /* Chaos timeline */
+  #chaos-log { overflow-y:auto; max-height:180px; }
+  .chaos-entry { display:flex; align-items:center; gap:12px; padding:8px;
+                 border-bottom:1px solid #1e2d40; font-size:12px; }
+  .chaos-dot { width:8px; height:8px; border-radius:50%; flex-shrink:0; }
+  .chaos-dot.inject { background:#ef4444; }
+  .chaos-dot.clear  { background:#22c55e; }
+
+  /* Chaos button */
+  .btn-chaos { background:#ef4444; color:#fff; border:none; padding:10px 20px;
+               border-radius:8px; cursor:pointer; font-size:13px; font-family:inherit;
+               margin-right:8px; transition:opacity 0.2s; }
+  .btn-chaos:hover { opacity:0.8; }
+  .btn-clear { background:#22c55e; }
+  .btn-row { margin-bottom:16px; display:flex; }
+
+  .status-dot { display:inline-block; width:8px; height:8px; border-radius:50%; margin-right:6px; }
+  .healthy  { background:#22c55e; }
+  .degraded { background:#f59e0b; }
+  .breach   { background:#ef4444; animation:pulse 1s infinite; }
+  .warming  { background:#64748b; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+
+  .conn-status { font-size:11px; color:#64748b; }
+  .conn-status.connected { color:#22c55e; }
+</style>
+</head>
+<body>
+<header>
+  <h1>⚡ NEBULASTREAM</h1>
+  <div style="display:flex;gap:12px;align-items:center">
+    <span class="conn-status" id="conn-status">● disconnected</span>
+    <span class="badge" id="shift-count">Shifts: 0</span>
+  </div>
+</header>
+
+<div class="grid">
+
+  <!-- Panel 1: World Map -->
+  <div class="panel" id="map-panel">
+    <h2>🌍 Global Latency Map</h2>
+    <svg id="world" viewBox="0 0 600 220">
+      <!-- Simplified world outline -->
+      <rect width="600" height="220" fill="#0a0e1a" rx="8"/>
+      <!-- Continents (simplified shapes) -->
+      <path d="M60,60 L120,50 L140,70 L130,100 L100,110 L70,95 Z" fill="#1e2d40" opacity="0.6"/>
+      <path d="M150,45 L280,40 L300,60 L290,90 L260,100 L200,95 L160,80 Z" fill="#1e2d40" opacity="0.6"/>
+      <path d="M310,55 L420,50 L460,70 L450,110 L400,120 L330,100 Z" fill="#1e2d40" opacity="0.6"/>
+      <path d="M430,60 L520,55 L540,80 L520,110 L470,115 L440,95 Z" fill="#1e2d40" opacity="0.6"/>
+      <!-- Region dots -->
+      <!-- US East -->
+      <circle id="dot-us-east" cx="130" cy="90" r="14" fill="#22c55e" opacity="0.9" class="region-dot"/>
+      <text x="130" y="94" text-anchor="middle" class="region-latency" fill="white" font-size="11" id="lat-us-east">—</text>
+      <text x="130" y="115" text-anchor="middle" class="region-label">US East</text>
+      <!-- EU West -->
+      <circle id="dot-eu-west" cx="270" cy="72" r="14" fill="#22c55e" opacity="0.9" class="region-dot"/>
+      <text x="270" y="76" text-anchor="middle" class="region-latency" fill="white" font-size="11" id="lat-eu-west">—</text>
+      <text x="270" y="97" text-anchor="middle" class="region-label">EU West</text>
+      <!-- AP South -->
+      <circle id="dot-ap-south" cx="470" cy="100" r="14" fill="#22c55e" opacity="0.9" class="region-dot"/>
+      <text x="470" y="104" text-anchor="middle" class="region-latency" fill="white" font-size="11" id="lat-ap-south">—</text>
+      <text x="470" y="125" text-anchor="middle" class="region-label">AP South</text>
+      <!-- Connection lines -->
+      <line x1="144" y1="90" x2="256" y2="72" stroke="#1e3a5f" stroke-width="1" stroke-dasharray="4"/>
+      <line x1="284" y1="72" x2="456" y2="100" stroke="#1e3a5f" stroke-width="1" stroke-dasharray="4"/>
+    </svg>
+  </div>
+
+  <!-- Panel 2: Traffic Weights -->
+  <div class="panel">
+    <h2>⚖️ Traffic Weights</h2>
+    <div class="weight-bar-wrap">
+      <div class="weight-bar-label">
+        <span><span class="status-dot healthy" id="s-us-east"></span>US East</span>
+        <span id="w-us-east">33%</span>
+      </div>
+      <div class="weight-bar-track">
+        <div class="weight-bar-fill bar-us" id="bar-us-east" style="width:33%">33%</div>
+      </div>
+    </div>
+    <div class="weight-bar-wrap">
+      <div class="weight-bar-label">
+        <span><span class="status-dot healthy" id="s-eu-west"></span>EU West</span>
+        <span id="w-eu-west">33%</span>
+      </div>
+      <div class="weight-bar-track">
+        <div class="weight-bar-fill bar-eu" id="bar-eu-west" style="width:33%">33%</div>
+      </div>
+    </div>
+    <div class="weight-bar-wrap">
+      <div class="weight-bar-label">
+        <span><span class="status-dot healthy" id="s-ap-south"></span>AP South</span>
+        <span id="w-ap-south">34%</span>
+      </div>
+      <div class="weight-bar-track">
+        <div class="weight-bar-fill bar-apac" id="bar-ap-south" style="width:34%">34%</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Panel 3: AI Decision Log -->
+  <div class="panel">
+    <h2>🤖 AI Decision Log</h2>
+    <div id="ai-log">
+      <div class="log-entry">
+        <div class="log-time">--:--:--</div>
+        <div class="log-text">Waiting for control plane...</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Panel 4: Chaos Timeline -->
+  <div class="panel">
+    <h2>💥 Chaos Control</h2>
+    <div class="btn-row">
+      <button class="btn-chaos" onclick="injectChaos()">💥 Inject EU Failure</button>
+      <button class="btn-chaos btn-clear" onclick="clearChaos()">✅ Clear Failure</button>
+    </div>
+    <div id="chaos-log">
+      <div class="chaos-entry">
+        <div class="chaos-dot clear"></div>
+        <span style="color:#64748b">No chaos events yet</span>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+const COLORS = {
+  healthy:  "#22c55e",
+  degraded: "#f59e0b",
+  breach:   "#ef4444",
+  warming:  "#64748b",
+};
+
+let ws;
+let shiftCount = 0;
+
+// Same-origin when served from FastAPI; falls back to localhost:8000 when opened as file://
+const API_BASE = (location.protocol === "file:" || location.port === "8080")
+  ? "http://localhost:8000"
+  : `${location.protocol}//${location.host}`;
+const WS_URL = (location.protocol === "file:" || location.port === "8080")
+  ? "ws://localhost:8000/ws"
+  : `${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/ws`;
+
+function connect() {
+  ws = new WebSocket(WS_URL);
+
+  ws.onopen = () => {
+    document.getElementById("conn-status").textContent = "● connected";
+    document.getElementById("conn-status").className = "conn-status connected";
+  };
+
+  ws.onclose = () => {
+    document.getElementById("conn-status").textContent = "● disconnected";
+    document.getElementById("conn-status").className = "conn-status";
+    setTimeout(connect, 3000);
+  };
+
+  ws.onmessage = (e) => {
+    const msg = JSON.parse(e.data);
+    handleMessage(msg);
+  };
+}
+
+function handleMessage(msg) {
+  if (msg.type === "init" || msg.type === "poll") {
+    updateLatencies(msg.latencies, msg.p95, msg.status);
+    updateWeights(msg.weights);
+    if (msg.type === "init" && msg.ai_log) {
+      msg.ai_log.forEach(addAiLog);
+    }
+  }
+  if (msg.type === "ai_thinking") {
+    addAiLog({ type:"thinking", reasoning: msg.message, timestamp: msg.timestamp });
+  }
+  if (msg.type === "ai_decision") {
+    shiftCount++;
+    document.getElementById("shift-count").textContent = `Shifts: ${shiftCount}`;
+    addAiLog(msg);
+    updateWeights(msg.new_weights);
+  }
+  if (msg.type === "ai_veto") {
+    addVetoLog(msg);
+  }
+  if (msg.type === "chaos") {
+    addChaosLog(msg);
+  }
+}
+
+function addVetoLog(entry) {
+  const log = document.getElementById("ai-log");
+  const div = document.createElement("div");
+  div.className = "log-entry veto";
+  const v = entry.verdict || {};
+  const conf = (v.confidence ?? 0).toFixed(2);
+  const thr  = (v.threshold  ?? 0).toFixed(2);
+  const confPct  = Math.round((v.confidence ?? 0) * 100);
+  const thrLeft  = Math.round((v.threshold  ?? 0) * 100);
+  const llmW   = entry.llm_proposal      || {};
+  const safeW  = entry.applied_proposal  || {};
+  div.innerHTML = `
+    <div class="log-time">${entry.timestamp || "--:--:--"} <span class="badge-veto">MVLC VETO</span></div>
+    <div class="log-text">${entry.reasoning || ""}</div>
+    <div class="veto-bar">
+      <span>conf ${conf}</span>
+      <div class="veto-meter"><div class="veto-fill" style="width:${confPct}%"></div></div>
+      <span>thr ${thr}</span>
+    </div>
+    <div class="veto-thresh" style="margin-left:${50}px"><span style="left:${thrLeft}%; position:absolute; top:-2px; bottom:-2px; width:2px; background:#94a3b8;"></span></div>
+    <div class="log-weights">
+      LLM:    US:${llmW["us-east"]||"?"}% EU:${llmW["eu-west"]||"?"}% APAC:${llmW["ap-south"]||"?"}%<br>
+      SAFE:   US:${safeW["us-east"]||"?"}% EU:${safeW["eu-west"]||"?"}% APAC:${safeW["ap-south"]||"?"}%
+    </div>
+    <div class="log-weights" style="color:#94a3b8">
+      cases=${v.cases_considered} aligned_success=${v.aligned_success} matched_failure=${v.aligned_failure}
+    </div>
+  `;
+  log.insertBefore(div, log.firstChild);
+  while (log.children.length > 30) log.removeChild(log.lastChild);
+}
+
+function updateLatencies(latencies, p95, status) {
+  if (!latencies) return;
+  const regions = ["us-east", "eu-west", "ap-south"];
+  regions.forEach((region) => {
+    const lat   = latencies[region];
+    const p     = p95 ? p95[region] : null;
+    const st    = (status && status[region]) || "warming";
+    const color = COLORS[st] || COLORS.warming;
+    const dot   = document.getElementById(`dot-${region}`);
+    const label = document.getElementById(`lat-${region}`);
+    const sdot  = document.getElementById(`s-${region}`);
+    if (dot)   { dot.style.fill = color; }
+    if (label) {
+      const v = (lat !== undefined && lat !== null) ? Math.round(lat) : null;
+      label.textContent = v !== null ? `${v}ms` : "—";
+      if (p !== null && p !== undefined) label.setAttribute("data-p95", `${Math.round(p)}ms p95`);
+    }
+    if (sdot)  { sdot.className = `status-dot ${st}`; }
+  });
+}
+
+function updateWeights(weights) {
+  if (!weights) return;
+  const map = { "us-east":"us-east", "eu-west":"eu-west", "ap-south":"ap-south" };
+  Object.entries(map).forEach(([region, id]) => {
+    const w = weights[region] || 0;
+    const bar = document.getElementById(`bar-${id}`);
+    const lbl = document.getElementById(`w-${id}`);
+    if (bar) { bar.style.width = `${w}%`; bar.textContent = `${w}%`; }
+    if (lbl) { lbl.textContent = `${w}%`; }
+  });
+}
+
+function addAiLog(entry) {
+  const log = document.getElementById("ai-log");
+  const div = document.createElement("div");
+  div.className = `log-entry ${entry.type === "ai_decision" ? "decision" : entry.type === "chaos" ? "chaos" : "thinking"}`;
+  const weights = entry.new_weights
+    ? `<div class="log-weights">→ US:${entry.new_weights["us-east"]}% EU:${entry.new_weights["eu-west"]}% APAC:${entry.new_weights["ap-south"]}%</div>`
+    : "";
+  let vetoBlock = "";
+  if (entry.veto && entry.veto.cases_considered) {
+    const v = entry.veto;
+    const conf = (v.confidence ?? 0).toFixed(2);
+    const confPct = Math.round((v.confidence ?? 0) * 100);
+    vetoBlock = `
+      <div class="veto-bar">
+        <span style="color:#94a3b8">MVLC ${conf}</span>
+        <div class="veto-meter"><div class="veto-fill" style="width:${confPct}%"></div></div>
+        <span style="color:#94a3b8">${v.cases_considered} cases</span>
+      </div>`;
+  }
+  div.innerHTML = `
+    <div class="log-time">${entry.timestamp || "--:--:--"}</div>
+    <div class="log-text">${entry.reasoning || entry.message || ""}</div>
+    ${weights}
+    ${vetoBlock}
+  `;
+  log.insertBefore(div, log.firstChild);
+  while (log.children.length > 30) log.removeChild(log.lastChild);
+}
+
+function addChaosLog(entry) {
+  const log = document.getElementById("chaos-log");
+  const div = document.createElement("div");
+  div.className = "chaos-entry";
+  div.innerHTML = `
+    <div class="chaos-dot ${entry.action}"></div>
+    <span>${entry.timestamp} — ${entry.action === "inject" ? "💥 Injected" : "✅ Cleared"} ${entry.region} ${entry.action === "inject" ? `(+${entry.delay_ms}ms)` : ""} ${entry.success ? "" : "❌ FAILED"}</span>
+  `;
+  log.insertBefore(div, log.firstChild);
+}
+
+async function injectChaos() {
+  try { await fetch(`${API_BASE}/chaos/inject`, { method: "POST" }); }
+  catch (e) { console.error("inject failed", e); }
+}
+
+async function clearChaos() {
+  try { await fetch(`${API_BASE}/chaos/clear`, { method: "POST" }); }
+  catch (e) { console.error("clear failed", e); }
+}
+
+connect();
+</script>
+</body>
+</html>

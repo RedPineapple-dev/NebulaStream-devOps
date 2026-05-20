@@ -1,0 +1,4 @@
+config:
+  nebulastream-infra:env: prod
+  nebulastream-infra:workerNameSuffix: ""
+  cloudflare:accountId: REPLACE_ME

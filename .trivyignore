@@ -1,0 +1,3 @@
+# Add CVE IDs here with a comment explaining why they're accepted.
+# Example:
+# CVE-2024-XXXX  # base image fix not yet released — review weekly

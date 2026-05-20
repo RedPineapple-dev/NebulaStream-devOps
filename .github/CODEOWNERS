@@ -1,0 +1,7 @@
+*                            @nebulastream/maintainers
+/apps/control-plane/         @nebulastream/control-plane
+/apps/wasm-worker/           @nebulastream/wasm
+/apps/edge-workers/          @nebulastream/edge
+/apps/dashboard/             @nebulastream/frontend
+/deploy/                     @nebulastream/devops
+/.github/workflows/          @nebulastream/devops

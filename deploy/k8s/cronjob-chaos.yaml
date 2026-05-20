@@ -1,0 +1,27 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: chaos-runner
+  namespace: nebulastream
+spec:
+  schedule: "0 */6 * * *"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 0
+      template:
+        spec:
+          restartPolicy: Never
+          serviceAccountName: control-plane
+          containers:
+            - name: chaos
+              image: ghcr.io/nebulastream/control-plane:latest
+              command: ["python", "chaos.py", "--once"]
+              envFrom:
+                - configMapRef: { name: control-plane-config }
+                - secretRef:    { name: control-plane-secrets }
+              resources:
+                requests: { cpu: 100m, memory: 256Mi }
+                limits:   { cpu: 500m, memory: 512Mi }

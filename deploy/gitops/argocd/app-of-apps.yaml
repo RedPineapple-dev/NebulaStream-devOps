@@ -1,0 +1,19 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: nebulastream-root
+  namespace: argocd
+spec:
+  project: nebulastream
+  source:
+    repoURL: https://github.com/REPLACE_ME/NebulaStream.git
+    targetRevision: main
+    path: gitops/argocd
+    directory:
+      recurse: true
+      include: '{project.yaml,application*.yaml}'
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: argocd
+  syncPolicy:
+    automated: { prune: true, selfHeal: true }

@@ -1,0 +1,29 @@
+name: helm-lint
+
+on:
+  push:
+    branches: [main]
+    paths: [deploy/helm/**, deploy/k8s/**]
+  pull_request:
+    paths: [deploy/helm/**, deploy/k8s/**]
+
+permissions: { contents: read }
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: azure/setup-helm@v4
+        with: { version: v3.15.0 }
+      - run: helm lint deploy/helm/nebulastream
+      - run: helm template deploy/helm/nebulastream | kubectl --dry-run=client apply -f - || true
+      - name: kubeconform
+        run: |
+          curl -fsSL https://github.com/yannh/kubeconform/releases/latest/download/kubeconform-linux-amd64.tar.gz | tar -xz
+          helm template deploy/helm/nebulastream | ./kubeconform -strict -summary -ignore-missing-schemas -kubernetes-version 1.30.0
+      - name: kustomize build
+        run: |
+          curl -s "https://raw.githubusercontent.com/kubernetes-sigs/kustomize/master/hack/install_kustomize.sh" | bash
+          ./kustomize build deploy/k8s/ > /tmp/manifests.yaml
+          wc -l /tmp/manifests.yaml

@@ -1,0 +1,22 @@
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: nebulastream
+  namespace: argocd
+spec:
+  description: NebulaStream project — control plane + observability
+  sourceRepos:
+    - "https://github.com/*/NebulaStream*"
+  destinations:
+    - namespace: nebulastream
+      server: https://kubernetes.default.svc
+    - namespace: monitoring
+      server: https://kubernetes.default.svc
+  clusterResourceWhitelist:
+    - { group: "",                kind: Namespace }
+    - { group: "rbac.authorization.k8s.io", kind: ClusterRole }
+    - { group: "rbac.authorization.k8s.io", kind: ClusterRoleBinding }
+  namespaceResourceWhitelist:
+    - { group: "*", kind: "*" }
+  orphanedResources:
+    warn: true

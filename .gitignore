@@ -1,0 +1,43 @@
+# Node
+node_modules/
+build/
+dist/
+*.map
+
+# Python
+__pycache__/
+*.pyc
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Logs / env
+*.log
+.env
+.env.local
+
+# Pulumi
+.pulumi/
+
+# Local docker state
+volumes/
+
+# Vendored binaries
+vendor/spin
+vendor/spin.sig
+
+# Generated reports / SBOMs
+reports/
+sbom.spdx.json
+*.sarif
+
+# Spin / Wasm
+*.wasm
+.spin/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Sensitive
+*.pem

@@ -1,0 +1,22 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "nebulastream.fullname" . }}-config
+  labels: {{- include "nebulastream.labels" . | nindent 4 }}
+data:
+  WORKER_US_EAST_URL:  {{ index .Values.config.workers "us-east"  | quote }}
+  WORKER_EU_WEST_URL:  {{ index .Values.config.workers "eu-west"  | quote }}
+  WORKER_AP_SOUTH_URL: {{ index .Values.config.workers "ap-south" | quote }}
+  POLL_INTERVAL_SEC:   {{ .Values.config.poll_interval_sec | quote }}
+  BREACH_THRESHOLD_MS: {{ .Values.config.breach_threshold_ms | quote }}
+  RATE_LIMIT_SEC:      {{ .Values.config.rate_limit_sec | quote }}
+  MIN_WEIGHT:          {{ .Values.config.min_weight | quote }}
+  OLLAMA_URL:          {{ .Values.config.ollama.url | quote }}
+  OLLAMA_EMBEDDINGS_URL: {{ .Values.config.ollama.embed_url | quote }}
+  OLLAMA_MODEL:        {{ .Values.config.ollama.model | quote }}
+  MILVUS_HOST:         {{ .Values.config.milvus.host | quote }}
+  MILVUS_PORT:         {{ .Values.config.milvus.port | quote }}
+  COLLECTION:          {{ .Values.config.milvus.collection | quote }}
+  VECTOR_DIM:          {{ .Values.config.milvus.vector_dim | quote }}
+  LOG_LEVEL:           {{ .Values.config.log_level | quote }}
+  LOG_FORMAT:          {{ .Values.config.log_format | quote }}

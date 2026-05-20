@@ -1,0 +1,6 @@
+name: nebulastream-infra
+runtime:
+  name: nodejs
+  options:
+    typescript: true
+description: NebulaStream — Cloudflare Workers + DNS, Fermyon Spin WASM app

@@ -1,0 +1,42 @@
+name: chaos
+
+on:
+  schedule:
+    - cron: "0 14 * * 2"   # Tuesdays 14:00 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  inject:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults: { run: { working-directory: apps/control-plane } }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - run: pip install -r requirements.txt
+      - name: Install wrangler
+        run: npm install -g wrangler
+      - name: Run chaos cycle
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          mkdir -p ../../reports
+          python chaos.py --once --prod --report ../../reports/chaos-$(date +%Y%m%d-%H%M).json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: chaos-report
+          path: reports/
+          retention-days: 90
+      - name: Commit report back to repo
+        if: success()
+        run: |
+          cd ../..
+          git config user.name  "chaos-bot"
+          git config user.email "chaos-bot@nebulastream.local"
+          git add reports/
+          git diff --cached --quiet || git commit -m "chore(chaos): scheduled run $(date -u +%Y-%m-%dT%H:%MZ)"
+          git push || true

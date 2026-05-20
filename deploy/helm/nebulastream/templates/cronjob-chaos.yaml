@@ -1,0 +1,22 @@
+{{- if .Values.chaos.enabled }}
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ include "nebulastream.fullname" . }}-chaos
+  labels: {{- include "nebulastream.labels" . | nindent 4 }}
+spec:
+  schedule: {{ .Values.chaos.schedule | quote }}
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          restartPolicy: Never
+          containers:
+            - name: chaos
+              image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+              command: ["python", "chaos.py", "--once"]
+              envFrom:
+                - configMapRef: { name: {{ include "nebulastream.fullname" . }}-config }
+                - secretRef:    { name: {{ include "nebulastream.fullname" . }}-secrets }
+{{- end }}

@@ -1,0 +1,5 @@
+config:
+  nebulastream-infra:env: dev
+  nebulastream-infra:workerNameSuffix: "-dev"
+  cloudflare:accountId: REPLACE_ME
+  # cloudflare:apiToken set via `pulumi config set --secret cloudflare:apiToken ...`

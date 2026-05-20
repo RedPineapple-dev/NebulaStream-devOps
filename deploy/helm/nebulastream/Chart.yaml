@@ -1,0 +1,14 @@
+apiVersion: v2
+name: nebulastream
+description: NebulaStream control plane — AI-driven edge traffic shifter
+type: application
+version: 0.1.0
+appVersion: "0.2.0"
+keywords: [edge, traffic, llm, milvus, ai]
+maintainers:
+  - name: NebulaStream
+dependencies:
+  - name: milvus
+    version: "4.2.x"
+    repository: https://zilliztech.github.io/milvus-helm
+    condition: milvus.enabled

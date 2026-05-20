@@ -1,0 +1,55 @@
+name: iac
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - deploy/infra/**
+      - .github/workflows/iac.yml
+  pull_request:
+    paths:
+      - deploy/infra/**
+
+permissions:
+  contents: read
+  pull-requests: write
+  id-token: write
+
+jobs:
+  preview:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    defaults: { run: { working-directory: deploy/infra } }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: "20", cache: npm, cache-dependency-path: deploy/infra/package-lock.json }
+      - run: npm ci
+      - uses: pulumi/actions@v5
+        with:
+          command: preview
+          stack-name: dev
+          work-dir: deploy/infra
+          comment-on-pr: true
+        env:
+          PULUMI_ACCESS_TOKEN: ${{ secrets.PULUMI_ACCESS_TOKEN }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+
+  up:
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    environment: production
+    defaults: { run: { working-directory: deploy/infra } }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: "20", cache: npm, cache-dependency-path: deploy/infra/package-lock.json }
+      - run: npm ci
+      - uses: pulumi/actions@v5
+        with:
+          command: up
+          stack-name: prod
+          work-dir: deploy/infra
+        env:
+          PULUMI_ACCESS_TOKEN: ${{ secrets.PULUMI_ACCESS_TOKEN }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}

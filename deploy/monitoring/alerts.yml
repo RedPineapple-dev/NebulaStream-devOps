@@ -1,0 +1,48 @@
+groups:
+  - name: nebulastream.rules
+    interval: 30s
+    rules:
+      - alert: RegionBreach
+        expr: nebula_region_p95_ms > 200
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "{{ $labels.region }} sustained breach (p95 > 200ms)"
+          description: "Region {{ $labels.region }} has p95 {{ $value | humanize }}ms for >1m."
+
+      - alert: RegionDown
+        expr: nebula_region_status == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "{{ $labels.region }} appears down (warming/no readings)"
+
+      - alert: LLMFailureRateHigh
+        expr: |
+          sum(rate(nebula_llm_calls_total{outcome="error"}[5m]))
+          /
+          sum(rate(nebula_llm_calls_total[5m])) > 0.2
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "LLM failure rate >20% over 5m"
+          description: "Control plane falling back to rule-based shifts more than 20% of the time."
+
+      - alert: NoShiftsApplied
+        expr: increase(nebula_shifts_total[15m]) == 0 and max(nebula_region_p95_ms) > 200
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Breach detected but no shifts applied in 15m"
+
+      - alert: TrafficWeightSumDrift
+        expr: abs(sum(nebula_region_weight_pct) - 100) > 1
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Region weights do not sum to 100"

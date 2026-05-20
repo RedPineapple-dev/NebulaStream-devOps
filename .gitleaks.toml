@@ -1,0 +1,23 @@
+title = "NebulaStream gitleaks config"
+
+[extend]
+useDefault = true
+
+[[rules]]
+id = "cloudflare-api-token-strict"
+description = "Cloudflare API token"
+regex = '''(?i)cloudflare[_-]?api[_-]?token['\"]?\s*[:=]\s*['\"]?([a-zA-Z0-9_-]{30,})'''
+secretGroup = 1
+tags = ["cloudflare", "token"]
+
+[allowlist]
+description = "Allowed placeholders in example/config files"
+regexes = [
+  '''REPLACE_ME''',
+  '''<.*>''',
+]
+paths = [
+  '''\.env\.example$''',
+  '''charts/nebulastream/values\.yaml$''',
+  '''infra/Pulumi\.(dev|prod)\.yaml$''',
+]

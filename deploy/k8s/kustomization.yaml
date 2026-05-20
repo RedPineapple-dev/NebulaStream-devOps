@@ -1,0 +1,17 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: nebulastream
+resources:
+  - namespace.yaml
+  - serviceaccount.yaml
+  - configmap.yaml
+  - secret.yaml
+  - deployment.yaml
+  - service.yaml
+  - hpa.yaml
+  - servicemonitor.yaml
+  - networkpolicy.yaml
+  - cronjob-chaos.yaml
+commonLabels:
+  app.kubernetes.io/part-of: nebulastream
+  app.kubernetes.io/managed-by: kustomize

@@ -1,0 +1,22 @@
+global:
+  resolve_timeout: 5m
+
+route:
+  receiver: default
+  group_by: [alertname, region]
+  group_wait: 30s
+  group_interval: 5m
+  repeat_interval: 1h
+  routes:
+    - matchers: [severity="critical"]
+      receiver: pager
+
+receivers:
+  - name: default
+    webhook_configs:
+      - url: http://control-plane:8000/alerts/webhook
+        send_resolved: true
+  - name: pager
+    webhook_configs:
+      - url: http://control-plane:8000/alerts/webhook
+        send_resolved: true

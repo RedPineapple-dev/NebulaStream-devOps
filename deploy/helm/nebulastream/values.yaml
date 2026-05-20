@@ -1,0 +1,60 @@
+image:
+  repository: ghcr.io/nebulastream/control-plane
+  tag: latest
+  pullPolicy: IfNotPresent
+
+replicaCount: 2
+
+resources:
+  requests: { cpu: 100m, memory: 256Mi }
+  limits:   { cpu: 1000m, memory: 1Gi }
+
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 6
+  targetCPUUtilizationPercentage: 70
+
+service:
+  type: ClusterIP
+  port: 8000
+
+serviceMonitor:
+  enabled: true
+  interval: 15s
+
+config:
+  poll_interval_sec: 5
+  breach_threshold_ms: 200
+  rate_limit_sec: 30
+  min_weight: 5
+  log_level: INFO
+  log_format: json
+  workers:
+    us-east:  https://nebula-us.nebulastream.workers.dev
+    eu-west:  https://nebula-eu.nebulastream.workers.dev
+    ap-south: https://nebula-apac.nebulastream.workers.dev
+  ollama:
+    url:        http://ollama:11434/api/generate
+    embed_url:  http://ollama:11434/api/embeddings
+    model:      llama3.2
+  milvus:
+    host: nebulastream-milvus
+    port: 19530
+    collection: incidents
+    vector_dim: 3072
+
+secrets:
+  cloudflareApiToken: ""
+  cloudflareAccountId: ""
+
+milvus:
+  enabled: true
+  cluster:
+    enabled: false
+  standalone:
+    replicas: 1
+
+chaos:
+  enabled: true
+  schedule: "0 */6 * * *"
