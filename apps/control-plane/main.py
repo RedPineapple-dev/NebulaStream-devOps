@@ -234,6 +234,8 @@ class ControlPlane:
                 region=primary_region,
                 fix_applied=fix_desc,
                 latency_ms=breach_latency,
+                weights_before=old_weights,
+                weights_after=new_weights,
                 recovery_seconds=recovery_sec,
                 fix_worked=worked,
             )

@@ -15,14 +15,14 @@ try:
     OLLAMA_URL   = settings.ollama_embed_url
     OLLAMA_MODEL = settings.ollama_model
     VECTOR_DIM   = settings.vector_dim
+    COLLECTION   = settings.collection
 except Exception:
     MILVUS_HOST  = "localhost"
     MILVUS_PORT  = 19530
     OLLAMA_URL   = "http://localhost:11434/api/embeddings"
     OLLAMA_MODEL = "llama3.2"
     VECTOR_DIM   = 3072
-
-COLLECTION = "incidents_v2"
+    COLLECTION   = "incidents"
 
 
 @dataclass
