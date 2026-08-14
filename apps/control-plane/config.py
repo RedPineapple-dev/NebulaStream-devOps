@@ -84,5 +84,68 @@ class Settings:
         default_factory=lambda: _env_int("RECOVERY_TIMEOUT_SEC", 120)
     )
 
+    # ── Distributed state (Redis) ────────────────────────────────────────────
+    redis_url: str = field(
+        default_factory=lambda: _env("REDIS_URL", "redis://localhost:6379/0")
+    )
+    instance_id: str = field(
+        default_factory=lambda: _env("POD_NAME", "cp-local")
+    )
+
+    # ── EWMA + Hysteresis ────────────────────────────────────────────────────
+    ewma_alpha: float = field(
+        default_factory=lambda: _env_float("EWMA_ALPHA", 0.2)
+    )
+    recovery_delta_ms: float = field(
+        default_factory=lambda: _env_float("RECOVERY_DELTA_MS", 30.0)
+    )
+
+    # ── Circuit Breaker (LLM calls) ──────────────────────────────────────────
+    cb_max_failures: int = field(
+        default_factory=lambda: _env_int("CB_MAX_FAILURES", 3)
+    )
+    cb_reset_seconds: float = field(
+        default_factory=lambda: _env_float("CB_RESET_SECONDS", 30.0)
+    )
+
+    # ── Security ─────────────────────────────────────────────────────────────
+    api_key: str = field(
+        default_factory=lambda: _env("ADMIN_API_KEY", "")  # empty = dev mode (no auth)
+    )
+    cors_origins: list = field(
+        default_factory=lambda: [
+            o.strip()
+            for o in _env("CORS_ORIGINS", "http://localhost:8000").split(",")
+            if o.strip()
+        ]
+    )
+
+    # ── Envoy integration ────────────────────────────────────────────────────
+    envoy_enabled: bool = field(
+        default_factory=lambda: _env("ENVOY_ENABLED", "false").lower() == "true"
+    )
+    envoy_admin_url: str = field(
+        default_factory=lambda: _env("ENVOY_ADMIN_URL", "http://envoy:9901")
+    )
+
+    # ── OpenTelemetry ────────────────────────────────────────────────────────
+    otel_enabled: bool = field(
+        default_factory=lambda: _env("OTEL_ENABLED", "true").lower() != "false"
+    )
+    otel_endpoint: str = field(
+        default_factory=lambda: _env("OTEL_EXPORTER_OTLP_ENDPOINT", "http://jaeger:4317")
+    )
+    otel_service_name: str = field(
+        default_factory=lambda: _env("OTEL_SERVICE_NAME", "nebula-control-plane")
+    )
+
+    # ── HTTP rate limiting ───────────────────────────────────────────────────
+    rate_limit_burst: float = field(
+        default_factory=lambda: _env_float("RATE_LIMIT_BURST", 100.0)
+    )
+    rate_limit_refill: float = field(
+        default_factory=lambda: _env_float("RATE_LIMIT_REFILL", 10.0)
+    )
+
 
 settings = Settings()

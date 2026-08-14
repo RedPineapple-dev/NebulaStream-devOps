@@ -7,16 +7,24 @@ from pathlib import Path
 
 import httpx
 import uvicorn
-from fastapi import FastAPI, Response, WebSocket, WebSocketDisconnect
+from fastapi import Depends, FastAPI, Response, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
+from pydantic import BaseModel
 
 import metrics as m
 import veto as veto_mod
+from auth import require_api_key
+from circuit_breaker import CircuitBreaker, CircuitBreakerOpen
 from config import settings
+from envoy_pusher import push_weights_to_envoy
+from ewma import EWMASmoother
 from logging_config import get_logger, setup_logging
 from memory import recall_cases, update_outcome
+from middleware import add_rate_limiter
+from redis_state import RedisState
+from tracing import get_tracer, setup_tracing
 
 setup_logging()
 log = get_logger("control_plane.server")
@@ -39,15 +47,44 @@ WORKER_DIRS = {
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # Tracing
+    setup_tracing(app)
+    # Redis connection (best-effort)
+    await redis_state.connect()
+    # Load persisted weights
+    default_w = {"us-east": 33, "eu-west": 33, "ap-south": 34}
+    loaded = await redis_state.load_weights(default_w)
+    state.weights.update(loaded)
     task = asyncio.create_task(control_loop())
     yield
     task.cancel()
+    await redis_state.close()
 
 
-app = FastAPI(title="NebulaStream Control Plane", version="0.2.0", lifespan=lifespan)
+app = FastAPI(title="NebulaStream Control Plane", version="0.3.0", lifespan=lifespan)
 app.add_middleware(
-    CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"]
+    CORSMiddleware,
+    allow_origins=settings.cors_origins,
+    allow_methods=["GET", "POST"],
+    allow_headers=["*"],
 )
+add_rate_limiter(
+    app,
+    capacity=settings.rate_limit_burst,
+    refill_rate=settings.rate_limit_refill,
+)
+
+# Module-level singletons initialised before lifespan runs.
+redis_state = RedisState(
+    redis_url=settings.redis_url,
+    instance_id=settings.instance_id,
+)
+llm_circuit_breaker = CircuitBreaker(
+    max_failures=settings.cb_max_failures,
+    reset_seconds=settings.cb_reset_seconds,
+    name="ollama",
+)
+tracer = get_tracer("nebula.control_plane")
 
 
 @app.get("/healthz")
@@ -96,6 +133,15 @@ class State:
         self.chaos_log = []
         self.injected_ms = {r: 0.0 for r in WORKERS}
         self.clients: list[WebSocket] = []
+        # Per-region EWMA smoothers for latency
+        self.ewma: dict[str, EWMASmoother] = {
+            r: EWMASmoother(
+                alpha=settings.ewma_alpha,
+                threshold_ms=BREACH_THRESHOLD_MS,
+                recovery_delta_ms=settings.recovery_delta_ms,
+            )
+            for r in WORKERS
+        }
 
     def p95(self, region):
         if not self.readings[region]:
@@ -159,8 +205,18 @@ async def websocket_endpoint(websocket: WebSocket):
 # ── Chaos inject endpoint ─────────────────────────────────────────────────────
 
 
-@app.post("/chaos/inject")
-async def chaos_inject(region: str = "eu-west", delay: int = 400):
+class ChaosInjectRequest(BaseModel):
+    region: str = "eu-west"
+    delay: int = 400
+
+
+class ChaosClearRequest(BaseModel):
+    region: str = "eu-west"
+
+
+@app.post("/chaos/inject", dependencies=[Depends(require_api_key)])
+async def chaos_inject(body: ChaosInjectRequest):
+    region, delay = body.region, body.delay
     if region not in WORKERS:
         event = {
             "type": "chaos",
@@ -173,6 +229,7 @@ async def chaos_inject(region: str = "eu-west", delay: int = 400):
         await broadcast(event)
         return event
     state.injected_ms[region] = float(delay)
+    m.chaos_injections_total.labels(region=region, type="latency").inc()
     event = {
         "type": "chaos",
         "action": "inject",
@@ -186,8 +243,9 @@ async def chaos_inject(region: str = "eu-west", delay: int = 400):
     return event
 
 
-@app.post("/chaos/clear")
-async def chaos_clear(region: str = "eu-west"):
+@app.post("/chaos/clear", dependencies=[Depends(require_api_key)])
+async def chaos_clear(body: ChaosClearRequest):
+    region = body.region
     if region not in WORKERS:
         event = {
             "type": "chaos",
@@ -210,6 +268,22 @@ async def chaos_clear(region: str = "eu-west"):
     state.chaos_log.append(event)
     await broadcast(event)
     return event
+
+
+@app.get("/api/leader")
+async def get_leader():
+    """Return the current leader instance ID."""
+    leader = await redis_state.get_leader()
+    return {
+        "leader": leader,
+        "self": redis_state.instance_id,
+        "is_leader": leader == redis_state.instance_id or leader is None,
+        "redis_connected": redis_state.connected,
+        "circuit_breaker": {
+            "state": llm_circuit_breaker.state.value,
+            "failures": llm_circuit_breaker.failure_count,
+        },
+    }
 
 
 # ── Control plane loop ────────────────────────────────────────────────────────
@@ -247,7 +321,7 @@ async def llm_proposal(latencies, weights):
 LATENCIES:\n{lat}\nCURRENT WEIGHTS:\n{w}
 RULES: weights sum to 100, no region below 5%, shift away from high-latency.
 Respond ONLY with JSON: {{"weights":{{"us-east":<int>,"eu-west":<int>,"ap-south":<int>}},"reasoning":"<one sentence>"}}"""
-    try:
+    async def _call_llm():
         async with httpx.AsyncClient(timeout=30.0) as client:
             r = await client.post(
                 OLLAMA_URL,
@@ -262,6 +336,16 @@ Respond ONLY with JSON: {{"weights":{{"us-east":<int>,"eu-west":<int>,"ap-south"
                 data.get("reasoning", ""),
                 False,
             )
+
+    try:
+        with tracer.start_as_current_span("llm_proposal") as span:
+            span.set_attribute("nebula.regions", str(list(latencies.keys())))
+            result = await llm_circuit_breaker.call(_call_llm)
+            return result
+    except CircuitBreakerOpen as cb_exc:
+        log.warning("llm_circuit_open", error=str(cb_exc))
+        w2, why = rule_based_proposal(latencies, weights)
+        return w2, f"[CB OPEN] {why}", True
     except Exception as ex:
         log.warning(
             "llm_proposal_failed", error_type=type(ex).__name__, error=str(ex)[:200]
@@ -320,6 +404,14 @@ async def control_loop():
     await asyncio.sleep(2)
     async with httpx.AsyncClient() as client:
         while True:
+            # ── Leader election ────────────────────────────────────────────
+            is_leader = await redis_state.try_acquire_leader()
+            m.leader_active.set(1 if is_leader else 0)
+            if not is_leader:
+                log.debug("not_leader_sleeping")
+                await asyncio.sleep(POLL_INTERVAL_SEC)
+                continue
+
             # Poll
             poll_results = {}
             for region, url in WORKERS.items():
@@ -353,8 +445,13 @@ async def control_loop():
                 }
             )
 
-            # Check breach
-            breaching = [r for r in WORKERS if state.p95(r) >= BREACH_THRESHOLD_MS]
+            # Update EWMA smoothers and Prometheus EWMA gauge
+            for r in WORKERS:
+                state.ewma[r].update(state.p95(r))
+                m.ewma_p95_ms.labels(region=r).set(state.ewma[r].value)
+
+            # Check breach using EWMA (hysteresis prevents flapping)
+            breaching = [r for r in WORKERS if state.ewma[r].should_trigger]
             can_shift = (time.monotonic() - state.last_shift) >= RATE_LIMIT_SEC
 
             if breaching and can_shift:
@@ -442,7 +539,7 @@ async def control_loop():
                             f"{verdict.cases_considered} historical cases]"
                         )
 
-                # ── 3. Apply ────────────────────────────────────────────────
+                # ── 3. Apply ────────────────────────────────────────────
                 m.shifts_total.labels(
                     outcome="fallback" if used_fallback else "llm"
                 ).inc()
@@ -450,6 +547,9 @@ async def control_loop():
                 state.weights = weights_after
                 state.last_shift = time.monotonic()
                 state.shift_count += 1
+                # Persist to Redis and push to Envoy (fire-and-forget)
+                asyncio.create_task(redis_state.save_weights(weights_after))
+                asyncio.create_task(push_weights_to_envoy(weights_after))
 
                 fix_desc = ", ".join(
                     f"{r} {weights_before[r]}%→{weights_after[r]}%"

@@ -233,13 +233,13 @@ def test_fastapi_endpoints():
     assert "nebula_region_latency_ms" in res.text
 
     # /chaos/inject
-    res = client.post("/chaos/inject?region=eu-west&delay=350")
+    res = client.post("/chaos/inject", json={"region": "eu-west", "delay": 350})
     assert res.status_code == 200
     assert res.json()["success"] is True
     assert res.json()["delay_ms"] == 350
 
     # /chaos/clear
-    res = client.post("/chaos/clear?region=eu-west")
+    res = client.post("/chaos/clear", json={"region": "eu-west"})
     assert res.status_code == 200
     assert res.json()["success"] is True
 

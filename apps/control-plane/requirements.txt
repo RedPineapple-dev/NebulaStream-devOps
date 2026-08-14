@@ -8,3 +8,15 @@ structlog==24.4.0
 prometheus-client==0.21.0
 setuptools<80
 marshmallow<4
+# Distributed state
+redis[hiredis]>=5.0
+# OpenTelemetry tracing
+opentelemetry-sdk>=1.25
+opentelemetry-instrumentation-fastapi>=0.46b0
+opentelemetry-exporter-otlp-proto-grpc>=1.25
+opentelemetry-exporter-otlp-proto-http>=1.25
+# Test dependencies (also installed in CI)
+pytest>=7.4
+pytest-asyncio>=0.23
+pytest-cov>=4.1
+fakeredis[aioredis]>=2.23

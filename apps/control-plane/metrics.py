@@ -108,6 +108,24 @@ veto_confidence = Histogram(
 )
 
 
+# ── EWMA & Circuit Breaker telemetry ─────────────────────────────────────────
+ewma_p95_ms = Gauge(
+    "nebula_ewma_p95_ms",
+    "Exponential Weighted Moving Average of p95 RTT for a region",
+    ["region"],
+    registry=registry,
+)
+circuit_breaker_state = Gauge(
+    "nebula_circuit_breaker_state",
+    "LLM circuit breaker state: 0=closed, 1=open, 2=half_open",
+    registry=registry,
+)
+leader_active = Gauge(
+    "nebula_leader_active",
+    "1 if this instance is the current control-plane leader, 0 otherwise",
+    registry=registry,
+)
+
 _STATUS_MAP = {"warming": 0, "healthy": 1, "degraded": 2, "breach": 3}
 
 
@@ -117,3 +135,4 @@ def record_status(region: str, status: str) -> None:
 
 def render_metrics() -> tuple[bytes, str]:
     return generate_latest(registry), CONTENT_TYPE_LATEST
+
