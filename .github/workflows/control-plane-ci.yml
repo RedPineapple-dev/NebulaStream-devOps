@@ -71,19 +71,14 @@ jobs:
           cache-to: type=gha,mode=max
           provenance: true
           sbom: true
-      - name: Trivy scan
-        uses: aquasecurity/trivy-action@v0.30.0
-        with:
-
-
-          image-ref: ${{ env.IMAGE }}:sha-${{ github.sha }}
-          format: sarif
-          output: trivy.sarif
-          exit-code: "0"
-          severity: HIGH,CRITICAL
+      - name: Install & Run Trivy scan
+        run: |
+          curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin
+          trivy image --format sarif --output trivy.sarif --severity HIGH,CRITICAL --exit-code 0 ${{ env.IMAGE }}:sha-${{ github.sha }}
       - name: Upload Trivy SARIF
         uses: github/codeql-action/upload-sarif@v3
         with: { sarif_file: trivy.sarif }
+
       - name: Install cosign
         uses: sigstore/cosign-installer@v3
       - name: Sign image
