@@ -74,7 +74,8 @@ jobs:
       - name: Install & Run Trivy scan
         run: |
           curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin
-          trivy image --format sarif --output trivy.sarif --severity HIGH,CRITICAL --exit-code 0 ${{ env.IMAGE }}:sha-${{ github.sha }}
+          IMAGE_LOWER=$(echo "${{ env.IMAGE }}" | tr '[:upper:]' '[:lower:]')
+          trivy image --format sarif --output trivy.sarif --severity HIGH,CRITICAL --exit-code 0 ${IMAGE_LOWER}:sha-${{ github.sha }}
       - name: Upload Trivy SARIF
         uses: github/codeql-action/upload-sarif@v3
         with: { sarif_file: trivy.sarif }
@@ -84,4 +85,7 @@ jobs:
       - name: Sign image
         env:
           DIGEST: ${{ steps.build.outputs.digest }}
-        run: cosign sign --yes ${{ env.IMAGE }}@${DIGEST}
+        run: |
+          IMAGE_LOWER=$(echo "${{ env.IMAGE }}" | tr '[:upper:]' '[:lower:]')
+          cosign sign --yes ${IMAGE_LOWER}@${DIGEST}
+
