@@ -72,8 +72,9 @@ jobs:
           provenance: true
           sbom: true
       - name: Trivy scan
-        uses: aquasecurity/trivy-action@0.24.0
+        uses: aquasecurity/trivy-action@0.28.0
         with:
+
           image-ref: ${{ env.IMAGE }}:sha-${{ github.sha }}
           format: sarif
           output: trivy.sarif
