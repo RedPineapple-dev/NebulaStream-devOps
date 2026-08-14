@@ -36,7 +36,7 @@ jobs:
       - name: Mypy
         run: mypy --ignore-missing-imports --no-strict-optional .
       - name: Pytest
-        run: pytest -q || true   # tests are optional for now
+        run: pytest -v
 
   build-push:
     needs: lint-test

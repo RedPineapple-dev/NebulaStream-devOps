@@ -19,19 +19,21 @@ anti-aligned with past actions that SUCCEEDED (low cosine to high-outcome past
 deltas). This is a form of case-based safety supervision layered on top of
 generative control.
 """
+
 from __future__ import annotations
+
 import math
-from dataclasses import dataclass, asdict
+from dataclasses import asdict, dataclass
 
 
 @dataclass
 class VetoVerdict:
     vetoed: bool
-    confidence: float          # 0.0..1.0, higher = more aligned with successful history
+    confidence: float  # 0.0..1.0, higher = more aligned with successful history
     threshold: float
     cases_considered: int
-    aligned_success: int       # past successes the proposal agrees with
-    aligned_failure: int       # past failures the proposal mirrors (bad)
+    aligned_success: int  # past successes the proposal agrees with
+    aligned_failure: int  # past failures the proposal mirrors (bad)
     reason: str
 
     def to_dict(self) -> dict:
@@ -45,8 +47,8 @@ def _delta(after: dict, before: dict) -> dict:
 def _cosine(a: dict, b: dict) -> float:
     keys = set(a) | set(b)
     dot = sum(a.get(k, 0.0) * b.get(k, 0.0) for k in keys)
-    na  = math.sqrt(sum(v * v for v in a.values()))
-    nb  = math.sqrt(sum(v * v for v in b.values()))
+    na = math.sqrt(sum(v * v for v in a.values()))
+    nb = math.sqrt(sum(v * v for v in b.values()))
     if na == 0.0 or nb == 0.0:
         return 0.0
     return dot / (na * nb)
@@ -77,7 +79,7 @@ def score_proposal(
 
     for case in past_cases:
         before = case.get("weights_before") or {}
-        after  = case.get("weights_after")  or {}
+        after = case.get("weights_after") or {}
         if not before or not after:
             continue
         past_delta = _delta(after, before)
@@ -85,8 +87,8 @@ def score_proposal(
             continue
 
         alignment = _cosine(proposed_delta, past_delta)
-        outcome   = float(case.get("outcome_score", 0.0))
-        sim       = max(0.0, float(case.get("similarity", 0.5)))
+        outcome = float(case.get("outcome_score", 0.0))
+        sim = max(0.0, float(case.get("similarity", 0.5)))
 
         if outcome >= 0.5:
             contrib = outcome * alignment

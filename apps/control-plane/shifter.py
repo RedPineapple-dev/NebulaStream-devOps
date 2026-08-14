@@ -1,30 +1,31 @@
-import httpx
 import asyncio
+import os
 import time
 
 CLOUDFLARE_API = "https://api.cloudflare.com/client/v4"
-ACCOUNT_ID     = "2e70f21983b5bc2d9cdc01f8ccad0721"
+ACCOUNT_ID = os.environ.get("CLOUDFLARE_ACCOUNT_ID", "")
+CF_TOKEN = os.environ.get("CLOUDFLARE_API_TOKEN", "")
 
 WORKER_URLS = {
-    "us-east":  "http://nebula-us.nebulastream.workers.dev",
-    "eu-west":  "http://nebula-eu.nebulastream.workers.dev",
+    "us-east": "http://nebula-us.nebulastream.workers.dev",
+    "eu-west": "http://nebula-eu.nebulastream.workers.dev",
     "ap-south": "http://nebula-apac.nebulastream.workers.dev",
 }
-
-import os
-CF_TOKEN = os.environ.get("CLOUDFLARE_API_TOKEN", "")
 
 # ── Rate limiting ─────────────────────────────────────────────────────────────
 
 _last_shift_time = 0.0
-RATE_LIMIT_SEC   = 30
+RATE_LIMIT_SEC = 30
+
 
 def can_shift() -> bool:
     return (time.monotonic() - _last_shift_time) >= RATE_LIMIT_SEC
 
+
 def mark_shifted():
     global _last_shift_time
     _last_shift_time = time.monotonic()
+
 
 # ── KV-based weight store (lightweight, no load balancer needed) ──────────────
 # We store weights in a Python dict and log them.
@@ -32,10 +33,11 @@ def mark_shifted():
 # plane IS the authoritative weight store.
 
 _current_weights: dict[str, int] = {
-    "us-east":  33,
-    "eu-west":  33,
+    "us-east": 33,
+    "eu-west": 33,
     "ap-south": 34,
 }
+
 
 async def apply_weights(new_weights: dict[str, int]) -> bool:
     """
@@ -61,7 +63,7 @@ async def apply_weights(new_weights: dict[str, int]) -> bool:
             print(f"  ❌ Invalid weight for {region}: {w}% (min 5%)")
             return False
 
-    print(f"\n  ⚙️  Applying traffic shift via Pulumi:")
+    print("\n  ⚙️  Applying traffic shift via Pulumi:")
     for region in _current_weights:
         old = _current_weights[region]
         new = new_weights.get(region, old)
@@ -70,13 +72,16 @@ async def apply_weights(new_weights: dict[str, int]) -> bool:
 
     _current_weights = dict(new_weights)
     mark_shifted()
-    print(f"  ✅ Weights applied successfully")
+    print("  ✅ Weights applied successfully")
     return True
+
 
 def get_current_weights() -> dict[str, int]:
     return dict(_current_weights)
 
+
 # ── Standalone test ───────────────────────────────────────────────────────────
+
 
 async def test():
     print("Testing traffic shifter...\n")
@@ -91,6 +96,7 @@ async def test():
     print("\nTesting rate limit (should be blocked)...")
     ok2 = await apply_weights({"us-east": 33, "eu-west": 33, "ap-south": 34})
     print(f"Second shift allowed: {ok2}")
+
 
 if __name__ == "__main__":
     asyncio.run(test())

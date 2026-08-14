@@ -6,7 +6,7 @@ metadata:
 spec:
   project: nebulastream
   source:
-    repoURL: https://github.com/REPLACE_ME/NebulaStream.git
+    repoURL: https://github.com/RedPineapple-dev/NebulaStream-devOps.git
     targetRevision: main
     path: gitops/argocd
     directory:

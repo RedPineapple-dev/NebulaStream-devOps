@@ -1,6 +1,15 @@
 """Prometheus metrics for the NebulaStream control plane."""
+
 from __future__ import annotations
-from prometheus_client import Counter, Gauge, Histogram, CollectorRegistry, generate_latest, CONTENT_TYPE_LATEST
+
+from prometheus_client import (
+    CONTENT_TYPE_LATEST,
+    CollectorRegistry,
+    Counter,
+    Gauge,
+    Histogram,
+    generate_latest,
+)
 
 registry = CollectorRegistry()
 

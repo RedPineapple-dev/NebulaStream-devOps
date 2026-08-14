@@ -1,8 +1,14 @@
 """Structured logging via structlog. Import setup_logging() once at startup."""
+
 from __future__ import annotations
+
 import logging
 import sys
+from collections.abc import Callable
+from typing import Any
+
 import structlog
+
 from config import settings
 
 
@@ -14,7 +20,7 @@ def setup_logging() -> None:
         level=level,
     )
 
-    processors = [
+    processors: list[Callable[..., Any]] = [
         structlog.contextvars.merge_contextvars,
         structlog.processors.add_log_level,
         structlog.processors.TimeStamper(fmt="iso", utc=True),
