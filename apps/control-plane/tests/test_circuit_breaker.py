@@ -1,8 +1,10 @@
 """Unit tests for the CircuitBreaker module."""
 
-import pytest
 import asyncio
-from circuit_breaker import CircuitBreaker, CircuitBreakerOpen, CBState
+
+import pytest
+
+from circuit_breaker import CBState, CircuitBreaker, CircuitBreakerOpen
 
 
 @pytest.fixture
@@ -13,10 +15,10 @@ def cb():
 @pytest.mark.asyncio
 async def test_circuit_breaker_closed_state(cb):
     assert cb.state == CBState.CLOSED
-    
+
     async def ok_fn():
         return "success"
-        
+
     res = await cb.call(ok_fn)
     assert res == "success"
     assert cb.failure_count == 0
@@ -53,12 +55,12 @@ async def test_circuit_breaker_half_open_recovery(cb):
     for _ in range(2):
         with pytest.raises(ValueError):
             await cb.call(fail_fn)
-            
+
     assert cb.state == CBState.OPEN
-    
+
     # Wait for reset timeout
     await asyncio.sleep(0.15)
-    
+
     # Next call probe succeeds
     res = await cb.call(ok_fn)
     assert res == "recovered"

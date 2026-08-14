@@ -11,17 +11,19 @@ Environment variables:
 
 from __future__ import annotations
 
-import logging
 import os
 
-log = logging.getLogger("control_plane.tracing")
+from logging_config import get_logger
+
+log = get_logger("control_plane.tracing")
+
 
 _OTEL_AVAILABLE = False
 try:
-    from opentelemetry import trace  # type: ignore[import]
-    from opentelemetry.sdk.resources import SERVICE_NAME, Resource  # type: ignore[import]
-    from opentelemetry.sdk.trace import TracerProvider  # type: ignore[import]
-    from opentelemetry.sdk.trace.export import BatchSpanProcessor  # type: ignore[import]
+    from opentelemetry import trace
+    from opentelemetry.sdk.resources import SERVICE_NAME, Resource
+    from opentelemetry.sdk.trace import TracerProvider
+    from opentelemetry.sdk.trace.export import BatchSpanProcessor
 
     _OTEL_AVAILABLE = True
 except ImportError:
@@ -44,14 +46,14 @@ def setup_tracing(app=None) -> None:
     try:
         # Prefer gRPC exporter; fall back to HTTP if unavailable.
         try:
-            from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import (  # type: ignore[import]
+            from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import (
                 OTLPSpanExporter as GrpcExporter,
             )
 
             exporter = GrpcExporter(endpoint=endpoint, insecure=True)
             log.info("otel_exporter", protocol="grpc", endpoint=endpoint)
         except ImportError:
-            from opentelemetry.exporter.otlp.proto.http.trace_exporter import (  # type: ignore[import]
+            from opentelemetry.exporter.otlp.proto.http.trace_exporter import (
                 OTLPSpanExporter as HttpExporter,
             )
 
@@ -68,7 +70,9 @@ def setup_tracing(app=None) -> None:
     # Auto-instrument FastAPI if app is provided.
     if app is not None:
         try:
-            from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor  # type: ignore[import]
+            from opentelemetry.instrumentation.fastapi import (
+                FastAPIInstrumentor,
+            )
 
             FastAPIInstrumentor.instrument_app(app)
             log.info("otel_fastapi_instrumented", service=service_name)
@@ -81,7 +85,7 @@ def setup_tracing(app=None) -> None:
 def get_tracer(name: str = "nebula"):
     """Return a tracer — a no-op tracer if OTel is disabled/unavailable."""
     if _OTEL_AVAILABLE:
-        from opentelemetry import trace  # type: ignore[import]
+        from opentelemetry import trace
 
         return trace.get_tracer(name)
 

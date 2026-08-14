@@ -1,7 +1,8 @@
 """Unit tests for RedisState with fakeredis."""
 
-import pytest
 import fakeredis.aioredis
+import pytest
+
 from redis_state import RedisState
 
 
@@ -10,7 +11,7 @@ async def test_redis_state_fallback(monkeypatch):
     # Test fallback when redis is disabled or fails
     state = RedisState(redis_url="redis://localhost:9999", instance_id="cp-1")
     state._enabled = False
-    
+
     assert await state.try_acquire_leader() is True
     weights = await state.load_weights({"us-east": 33, "eu-west": 33, "ap-south": 34})
     assert weights["us-east"] == 33

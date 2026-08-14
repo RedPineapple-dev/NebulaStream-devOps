@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import time
 
-from fastapi import FastAPI, Request, Response
+from fastapi import FastAPI, Response
 
 
 class _TokenBucket:
@@ -82,8 +82,9 @@ def add_rate_limiter(
 ) -> None:
     """Attach the token-bucket rate limiter middleware to *app*."""
     app.add_middleware(
-        TokenBucketMiddleware,  # type: ignore[arg-type]
+        TokenBucketMiddleware,
         capacity=capacity,
         refill_rate=refill_rate,
         exempt_paths=exempt_paths,
     )
+

@@ -4,7 +4,6 @@ import pytest
 
 from ewma import EWMASmoother, compute_ewma
 
-
 # ── compute_ewma (stateless helper) ──────────────────────────────────────────
 
 

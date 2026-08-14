@@ -15,14 +15,17 @@ Environment variables:
 
 from __future__ import annotations
 
-import logging
 import os
 
 import httpx
 
-log = logging.getLogger("control_plane.envoy_pusher")
+from logging_config import get_logger
+
+log = get_logger("control_plane.envoy_pusher")
 
 ENVOY_ENABLED = os.getenv("ENVOY_ENABLED", "false").lower() == "true"
+
+
 ENVOY_ADMIN_URL = os.getenv("ENVOY_ADMIN_URL", "http://envoy:9901")
 ENVOY_MODE = os.getenv("ENVOY_MODE", "admin")
 ENVOY_CLUSTER_NAME = os.getenv("ENVOY_CLUSTER_NAME", "nebula_workers")

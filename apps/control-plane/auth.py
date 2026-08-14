@@ -16,7 +16,7 @@ from __future__ import annotations
 
 import os
 
-from fastapi import Depends, HTTPException, Security, status
+from fastapi import HTTPException, Security, status
 from fastapi.security import APIKeyHeader
 
 _API_KEY_HEADER = APIKeyHeader(name="X-API-KEY", auto_error=False)

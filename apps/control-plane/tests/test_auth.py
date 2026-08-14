@@ -2,6 +2,7 @@
 
 import pytest
 from fastapi.testclient import TestClient
+
 from server import app
 
 
@@ -19,7 +20,7 @@ def test_auth_dev_mode(client, monkeypatch):
 
 def test_auth_enforced_when_configured(client, monkeypatch):
     monkeypatch.setenv("ADMIN_API_KEY", "super-secret-key")
-    
+
     # Missing header -> 403
     res = client.post("/chaos/inject", json={"region": "eu-west", "delay": 300})
     assert res.status_code == 403

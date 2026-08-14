@@ -20,18 +20,20 @@ Usage::
 
 from __future__ import annotations
 
-import logging
 from typing import Any
 
-log = logging.getLogger("control_plane.redis_state")
+from logging_config import get_logger
 
-_REDIS_AVAILABLE = False
+log = get_logger("control_plane.redis_state")
+
+
 try:
-    import redis.asyncio as aioredis  # type: ignore[import]
+    import redis.asyncio as aioredis
 
     _REDIS_AVAILABLE = True
 except ImportError:
-    aioredis = None  # type: ignore[assignment]
+    aioredis = None
+
 
 LEADER_KEY = "nebula_leader"
 WEIGHTS_KEY = "nebula_weights"
