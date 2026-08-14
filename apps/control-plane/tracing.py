@@ -12,6 +12,7 @@ Environment variables:
 from __future__ import annotations
 
 import os
+from typing import Any
 
 from logging_config import get_logger
 
@@ -44,6 +45,7 @@ def setup_tracing(app=None) -> None:
     provider = TracerProvider(resource=resource)
 
     try:
+        exporter: Any
         # Prefer gRPC exporter; fall back to HTTP if unavailable.
         try:
             from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import (
@@ -64,6 +66,7 @@ def setup_tracing(app=None) -> None:
         provider.add_span_processor(BatchSpanProcessor(exporter))
     except Exception as exc:
         log.warning("otel_exporter_setup_failed", error=str(exc)[:120])
+
 
     trace.set_tracer_provider(provider)
 
